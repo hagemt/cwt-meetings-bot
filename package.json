@@ -4,6 +4,7 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "admin-on-rest": "^1.4.0",
     "bunyan": "1.8.12",
     "config": "1.30.0",
     "http-shutdown": "1.2.0",
@@ -12,6 +13,9 @@
     "koa-router": "7.4.0",
     "koa-static": "4.0.2",
     "lodash": "4.17.5",
+    "react": "^16.2.0",
+    "react-dom": "^16.2.0",
+    "react-scripts": "1.1.1",
     "supertest": "3.0.0"
   },
   "devDependencies": {
@@ -31,7 +35,9 @@
     "prereport": "npm run lint -- --fix",
     "report": "npm run coverage",
     "postreport": "npm run lint -- --max-warnings 0",
-    "start": "npm run mvp",
-    "test": "npm run report"
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
   }
 }
