@@ -6,8 +6,11 @@
   "dependencies": {
     "boom": "7.2.0",
     "bunyan": "1.8.12",
+    "ciscospark": "1.29.4",
     "ciscospark-webhook-validator": "1.0.0",
     "config": "1.30.0",
+    "dataloader": "1.4.0",
+    "googleapis": "27.0.0",
     "http-shutdown": "1.2.0",
     "koa": "2.5.0",
     "koa-omnibus": "0.9.3",

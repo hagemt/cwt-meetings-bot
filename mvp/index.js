@@ -1,37 +1,18 @@
 const http = require('http')
-const path = require('path')
 
-const Bunyan = require('bunyan')
 const config = require('config')
 const httpShutdown = require('http-shutdown')
 const koaOmnibus = require('koa-omnibus')
 const _ = require('lodash')
 
+const Logging = require('./logging.js')
 const Routers = require('./routers.js')
-
-const createRootLogger = _.once(() => {
-	const logSerializers = {}
-	Object.assign(logSerializers, Bunyan.stdSerializers)
-	const logStreams = []
-	logStreams.push({
-		stream: process.stdout,
-	})
-	return Bunyan.createLogger({
-		component: path.dirname(__dirname),
-		level: config.get('logger.level'),
-		name: config.get('logger.name'),
-		serializers: logSerializers,
-		streams: logStreams,
-	})
-})
-
-const getLogger = (...args) => {
-	const fields = Object.assign({}, ...args)
-	return createRootLogger().child(fields)
-}
+const behaviors = require('./behaviors.js')
 
 const getServer = _.once(() => {
-	const application = koaOmnibus.createApplication()
+	const application = koaOmnibus.createApplication({
+		//targetLogger: (options, context, fields) => Logging.getChildLogger(fields),
+	})
 	for (const router of Routers.getAll()) {
 		application.use(router.allowedMethods())
 		application.use(router.routes())
@@ -42,7 +23,8 @@ const getServer = _.once(() => {
 })
 
 const createService = _.once(() => {
-	const log = getLogger({
+	behaviors.demoBehaviors()
+	const log = Logging.getChildLogger({
 		component: 'service',
 	})
 	const server = getServer()
