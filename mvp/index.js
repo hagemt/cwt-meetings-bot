@@ -7,7 +7,6 @@ const _ = require('lodash')
 
 const Logging = require('./logging.js')
 const Routers = require('./routers.js')
-const behaviors = require('./behaviors.js')
 
 const getServer = _.once(() => {
 	const application = koaOmnibus.createApplication({
@@ -23,7 +22,6 @@ const getServer = _.once(() => {
 })
 
 const createService = _.once(() => {
-	behaviors.demoBehaviors()
 	const log = Logging.getChildLogger({
 		component: 'service',
 	})

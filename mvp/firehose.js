@@ -5,7 +5,7 @@ const _ = require('lodash')
 
 const PACKAGE_JSON = require('../package.json')
 
-const ALL_CHANNEL_NAME = '*'
+const ALL_CHANNEL_NAME = 'spark:*'
 const CHANNEL_NAMES = new Set([
 	'spark:memberships:created',
 	'spark:memberships:updated',
@@ -115,7 +115,7 @@ module.exports = {
 /* istanbul ignore next */
 if (!module.parent) {
 	const bus = createEventBus()
-	bus.register('*', async function print (...args) {
+	bus.register(ALL_CHANNEL_NAME, async function print (...args) {
 		this.log.info(`called with ${args.length} argument(s)`)
 	})
 	const data = { text: 'Test!' } // from a webhook delivery envelope

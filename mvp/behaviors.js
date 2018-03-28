@@ -1,29 +1,26 @@
-const { getEventBus } = require('./EventBus.js')
-// https://www.npmjs.com/package/node-fetch
-//const fetch = require('node-fetch')
+const { getEventBus } = require('./firehose.js')
 
-const demoBehaviors = (firehose = getEventBus()) => {
+const hackathonDemo = (events = getEventBus()) => {
 
-	firehose.on('spark:messages:created', async function echo ({ auth, data }) {
-		const { roomId, text } = await auth.spark.client.messages.get(data.id)
-		const sent = await auth.spark.client.messages.create({ roomId, text })
-		this.log.info({ data, sent }, 'echo message sent to/from Spark user')
-		/*
-	const response = await fetch('https://api.googleapis.com/gsuite', {
-		body: {},
-		headers: {
-			'authorization': `Bearer ${auth.token}`,
-		},
-	})
-	*/
-		// use node-fetch here w/ headers['authorization'] = `Bearer ${token}`
-		// auth object can be built however is necessary (gsuite and spark)
-	})
+	events.on('spark:*',
+		async function log ({ data }) {
+			events.log.info({ data }, 'just FYI')
+		})
 
-	// add other handlers for more behaviors here; @see getEventBus
+	events.on('spark:messages:created',
+		async function book ({ clients, data }) {
+			const { roomId, text } = await clients.cisco.spark.messages.get(data.id)
+			const { data: resources } = await clients.google.listCalendarResources()
+			const { data: event } = await clients.google.createCalendarEvent()
+			const { data: list } = await clients.google.listCalendarEvents()
+			const message = await clients.cisco.spark.messages.create({ roomId, text })
+			events.log.info({ event, list, message, resources }, 'responded to message')
+		})
+
+	return events
 
 }
 
 module.exports = {
-	demoBehaviors,
+	hackathonDemo,
 }

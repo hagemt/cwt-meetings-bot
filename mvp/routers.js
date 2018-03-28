@@ -1,33 +1,37 @@
 const Boom = require('boom')
+const config = require('config')
 const KoaRouter = require('koa-router')
 const _ = require('lodash')
 
-const { ciscospark, gsuite } = require('config')
-const { getEventBus } = require('./EventBus.js')
-const CSWV = require('ciscospark-webhook-validator')
-CSWV.getAccessToken = async () => ciscospark.bot.secret
+const { hackathonDemo } = require('./behaviors.js')
+const { loadAll } = require('./clients.js')
+const { getEventBus } = require('./firehose.js')
 
-const { doEverything } = require('./bullshit.js')
+const bot = config.get('ciscospark.bot')
+const service = config.get('gsuite.service')
+
+const CSWV = require('ciscospark-webhook-validator')
+CSWV.getAccessToken = async () => bot.secret
 
 const createRouters = _.once(() => {
-	const firehose = getEventBus() // singleton
+	const firehose = hackathonDemo(getEventBus())
 	const v0 = new KoaRouter({ prefix: '/v0' })
 	v0.get('/ping', async ({ response }) => {
-		response.body = {
-			lastUpdated: new Date().toISOString(),
-		}
+		const lastUpdated = new Date().toISOString()
+		const upstreamServices = [] // could ping Hydra
+		response.body = { lastUpdated, upstreamServices }
 		response.status = 200 // OK
 	})
 	v0.post('/echo', async ({ request, response }) => {
-		const { actorId, data, event, id, resource } = await CSWV.validate(request)
-		const ignore = actorId === ciscospark.bot.actorId || id !== ciscospark.bot.webhookId
-		if (ignore) return response.status = 204
-		const auth = await doEverything({ ciscospark, data, gsuite })
-		const object = { auth, data } // passed to behavior handler
-		//const string = JSON.stringify({ data }) // should be a coordinate
-		const handled = firehose.emit(`spark:${resource}:${event}`, object)
-		if (!handled) throw Boom.notAcceptable('no handler registered')
-		response.status = 202 // Accepted
+		try {
+			const { actorId, data, event, id, resource } = await CSWV.validate(request) // may throw Error
+			if (actorId === bot.actorId || id !== bot.webhookId) return response.status = 204 // No Content
+			const clients = await loadAll({ ciscospark: { bot }, gsuite: { service }, webhook: { data } })
+			response.body = { consumed: firehose.consume(`spark:${resource}:${event}`, { clients, data }) }
+			response.status = 200 // OK
+		} catch (error) {
+			throw Boom.badRequest(error.message)
+		}
 	})
 	return [v0]
 })
