@@ -4,18 +4,19 @@ const { google } = require('googleapis')
 const Spark = require('ciscospark')
 const _ = require('lodash')
 
+const Logging = require('./logging.js')
+const log = Logging.getChildLogger({
+	component: 'clients',
+})
+
 const GOOGLE_CALENDAR_SCOPES = Object.freeze([
 	'https://www.googleapis.com/auth/admin.directory.resource.calendar',
 	'https://www.googleapis.com/auth/calendar',
 ])
 
-const GOOGLE_EMAILS = {
+const GOOGLE_GSUITE_EMAILS = {
+	'joshand@cisco.com': 'josh@onetooneandon.to',
 	'tohagema@cisco.com': 'tor@onetooneandon.to',
-}
-
-const GOOGLE_PLACES = {
-	'Earth': 'onetooneandon.to_3130393733393133373332@resource.calendar.google.com',
-	'Mars': 'onetooneandon.to_3236363931363433333230@resource.calendar.google.com',
 }
 
 const loadGoogleClients = ({ key, who }) => {
@@ -24,7 +25,7 @@ const loadGoogleClients = ({ key, who }) => {
 		email: key.client_email, // service account
 		key: key.private_key, // 2048-bit RSA
 		scopes: GOOGLE_CALENDAR_SCOPES,
-		subject: GOOGLE_EMAILS[who],
+		subject: GOOGLE_GSUITE_EMAILS[who],
 	})
 
 	const adminDirectoryV1 = google.admin('directory_v1')
@@ -36,38 +37,40 @@ const loadGoogleClients = ({ key, who }) => {
 
 	return Object.freeze({
 
-		createCalendarEvent: async () => {
-			const event = {
-				'summary': 'Summary',
-				'location': 'Location',
-				'description': 'Description',
-				'start': {
-					'dateTime': '2018-04-01T09:00:00-07:00',
-					//'timeZone': 'America/Los_Angeles',
-				},
-				'end': {
-					'dateTime': '2018-04-01T17:00:00-07:00',
-					//'timeZone': 'America/Los_Angeles',
-				},
-				'attendees': [
-					{ email: GOOGLE_PLACES['Earth'], responseStatus: 'accepted' },
-				],
+		createCalendarEvent: async ({ start, end, emails, details }) => {
+			const [firstEmail, ...otherEmails] = emails
+			const invited = [{
+				email: firstEmail,
+				responseStatus: 'accepted',
+			}]
+			for (const email of otherEmails) {
+				invited.push({ email })
 			}
+			const event = {
+				attendees: invited,
+				description: details,
+				end: { dateTime: end },
+				start: { dateTime: start },
+				summary: 'Spark Meeting',
+			}
+			log.info({ event }, 'create')
 			return createCalendarEvent({
-				auth: viaJWT,
+				auth: viaJWT, // default:
 				calendarId: 'primary',
 				resource: event,
 			})
 		},
 
 		listCalendarEvents: async () => {
+			log.info('will list events')
 			return listCalendarEvents({
-				auth: viaJWT,
+				auth: viaJWT, // default:
 				calendarId: 'primary',
 			})
 		},
 
 		listCalendarResources: async () => {
+			log.info('will list resources')
 			return listCalendarResources({
 				auth: viaJWT, // what?
 				customer: 'my_customer',

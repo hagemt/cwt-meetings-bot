@@ -22,7 +22,7 @@ const createRouters = _.once(() => {
 		response.body = { lastUpdated, upstreamServices }
 		response.status = 200 // OK
 	})
-	v0.post('/echo', async ({ request, response }) => {
+	v0.post('/demo', async ({ request, response }) => {
 		try {
 			const { actorId, data, event, id, resource } = await CSWV.validate(request) // may throw Error
 			if (actorId === bot.actorId || id !== bot.webhookId) return response.status = 204 // No Content
