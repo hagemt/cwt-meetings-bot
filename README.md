@@ -1,6 +1,12 @@
 # Cisco Spark Bot to Schedule Meeting Rooms
 
-Hackathon code for Develop@Cisco 2018 (Cisco Spark bot to help schedule meetings)
+Hackathon code for Develop@Cisco 2018 (MVP: Cisco Spark bot to help schedule meetings)
+
+When I ask it "book XYZ tomorrow at 4pm" look at the calendar and add XYZ as where to meet.
+
+If there's not a meeting, IDK maybe it should create one with just one person invited. (you)
+
+TBD: other commands, or a more logical interface, without scope creeping too far into NLP.
 
 ## Philosophy
 
