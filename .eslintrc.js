@@ -7,15 +7,21 @@ module.exports = {
 
 	extends: [
 		'eslint:recommended',
+		'plugin:import/recommended',
 	],
 
 	parserOptions: {
 		ecmaVersion: 2017,
 	},
 
+	plugins: [
+		'import',
+	],
+
 	root: true,
 
 	rules: {
+		'import/unambiguous': 'off',
 		'indent': ['error', 'tab'],
 		'linebreak-style': ['error', 'unix'],
 		'quotes': ['error', 'single'],

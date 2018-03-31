@@ -6,6 +6,7 @@ const defaults = {
 		name: PACKAGE_JSON.name || 'mvp',
 	},
 	server: {
+		type: process.env.NODE_ENV || 'development',
 		port: Number(process.env.PORT) || 8080,
 	},
 }

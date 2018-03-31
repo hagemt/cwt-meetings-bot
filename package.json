@@ -1,6 +1,6 @@
 {
   "name": "ciscospark-meetingbot",
-  "version": "0.0.0-hackathon",
+  "version": "0.0.0-alpha",
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
@@ -9,27 +9,30 @@
     "chrono-node": "1.3.5",
     "ciscospark": "1.29.4",
     "ciscospark-webhook-validator": "1.0.0",
+    "co-body": "5.1.1",
     "config": "1.30.0",
     "dataloader": "1.4.0",
-    "googleapis": "27.0.0",
+    "eslint": "4.19.1",
+    "eslint-plugin-import": "2.10.0",
+    "eslint-plugin-mocha": "5.0.0",
+    "eslint-plugin-node": "6.0.1",
+    "googleapis": "28.0.1",
     "http-shutdown": "1.2.0",
     "koa": "2.5.0",
     "koa-omnibus": "0.9.3",
     "koa-router": "7.4.0",
     "koa-static": "4.0.2",
     "lodash": "4.17.5",
-    "moment": "2.21.0",
-    "moment-natural": "0.0.2",
-    "moment-parser": "0.3.0",
-    "natural": "0.5.6",
+    "mocha": "5.0.5",
+    "moment": "2.22.0",
+    "ngrok": "3.0.1",
+    "node-fetch": "2.1.2",
+    "nyc": "11.6.0",
     "stopwords": "0.0.9",
     "supertest": "3.0.0"
   },
-  "devDependencies": {
-    "eslint": "4.18.1",
-    "eslint-plugin-import": "2.9.0",
-    "mocha": "5.0.1",
-    "nyc": "11.4.1"
+  "engines": {
+    "node": ">=8.0.0"
   },
   "scripts": {
     "precoverage": "nyc -- npm run mocha",
