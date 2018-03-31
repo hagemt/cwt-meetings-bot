@@ -7,6 +7,7 @@ const _ = require('lodash')
 
 const Logging = require('./logging.js')
 const Routers = require('./routers.js')
+const webhooks = require('./webhooks.js')
 
 const getServer = _.once(() => {
 	const application = koaOmnibus.createApplication({
@@ -38,7 +39,7 @@ const startService = async ({ log, server }, { port } = {}) => {
 		})
 		server.once('listening', () => {
 			const options = {
-				port: portNumber,
+				PORT: portNumber,
 			}
 			log.info(options, 'listening')
 			resolve(options)
@@ -66,9 +67,21 @@ module.exports = {
 if (!module.parent) {
 	const service = createService()
 	startService(service)
+		.then(async () => {
+			const NODE_ENV = config.get('server.type')
+			switch (NODE_ENV) {
+			case 'production':
+				await webhooks.productionService(service)
+				break
+			default:
+				await webhooks.developmentService(service)
+			}
+			service.log.info({ NODE_ENV }, 'ready')
+		})
 		.catch((error) => {
-			service.log.fatal({ err: error })
-			//process.exitCode = 1 // later
+			service.log.fatal({ err: error }, 'failed to start')
+			//process.exitCode = 1 // use this if possible
+			// eslint-disable-next-line no-process-exit
 			process.exit(1)
 		})
 }

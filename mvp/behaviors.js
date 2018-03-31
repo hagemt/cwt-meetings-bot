@@ -4,41 +4,37 @@ const path = require('path')
 const chrono = require('chrono-node')
 const moment = require('moment')
 const _ = require('lodash')
-/*
-const momentNatural = require('moment-natural')
-const momentParser = require('moment-parser')
-const natural = require('natural')
-const stopwords = require('stopwords')
-const blacklist = new Set(stopwords.english)
-*/
 
 const { getEventBus } = require('./firehose.js')
+const { getChildLogger } = require('./logging.js')
 
-const hackathonDemo = (firehose = getEventBus()) => {
+const hackathonDemo = (bus = getEventBus()) => {
 
-	const isEmailAddress = any => any.includes('@')
-	const denyEmailAddress = async ({ clients, roomId }) => {
-		const english = 'Sorry, but I only answer to Cisco employees.'
-		return clients.cisco.spark.message.create({ roomId, text: english })
-	}
+	const log = getChildLogger({
+		component: 'hackathon',
+	})
+
+	const INSTRUCTIONS = fs.readFileSync(path.resolve(__dirname, 'instructions.md')).toString()
+	const CONFERENCE_ROOM_TYPES = new Set(['CONFERENCE_ROOM']) // TODO: change these to suit GSuite?
+	const isConferenceRoom = ({ resourceCategory }) => CONFERENCE_ROOM_TYPES.has(resourceCategory)
+	const isEmailAddress = any => /.@./.test(any) // TODO: proper check for RFC email address?
 
 	const DEFAULT_MEETING_DURATION = { minutes: 15 } // short enough that it's probably ideal
 	const [HOUR_TOO_EARLY, HOUR_TOO_LATE, MINUTES_TOO_FEW, MINUTES_TOO_MANY] = [6, 22, 1, 121]
-	const INSTRUCTIONS = fs.readFileSync(path.resolve(__dirname, 'instructions.md')).toString()
-	const isConferenceRoom = ({ resourceCategory }) => resourceCategory === 'CONFERENCE_ROOM'
+	const LUNCHTIMES = ['11:35', '11:45', '11:55', '12:05', '12:15', '12:25', '12:35', '12:45', '12:55']
 	const nextInterval = (now = new Date()) => [now, moment(now).add(DEFAULT_MEETING_DURATION).toDate()]
-	const summarizeError = ({ code, stack }) => Object.assign(new Error('Google APIs'), { code, stack })
-	const summarizeRoom = ({ generatedResourceName }) => generatedResourceName
+
+	const summarizeError = ({ code, message, stack }) => Object.assign(new Error(message || '@#$%'), { code, stack })
+	const summarizeRoom = ({ generatedResourceName }) => generatedResourceName // e.g. BUILDING-FLOOR-ROOM (CAPACITY)
 
 	const warnings = (start, end) => {
-		const isBetween = any => moment(any, 'hh:mm').isBetween(start, end, 'minute')
-		const isLunch = ['11:35', '11:45', '11:55', '12:05', '12:20'].some(isBetween)
-		const isEarly = moment(start).hours(8).minutes(0).seconds(0).isAfter(start)
-		const isLate = moment(start).hours(18).minutes(0).seconds(0).isBefore(start)
-		if (isLunch) return '\n\n> Protip: meetings over lunch are sometimes a bad idea.'
-		if (isEarly) return '\n\n> Protip: early meetings are sometimes a bad idea.'
-		if (isLate) return '\n\n> Protip: late meetings are sometimes a bad idea.'
-		return '\n\n> Protip: time zones can make meetings extra difficult.'
+		const isEarly = moment(start).hours(9).minutes(0).seconds(0).milliseconds(0).isAfter(start)
+		if (isEarly) return '\n\n> Protip: early meetings are sometimes a bad idea. Remember, engineers!'
+		const isLate = moment(start).hours(17).minutes(0).seconds(0).milliseconds(0).isBefore(start)
+		if (isLate) return '\n\n> Protip: late meetings are sometimes a bad idea. Remember, parents!'
+		const isLunch = LUNCHTIMES.some(any => moment(any, 'hh:mm').isBetween(start, end, 'minute'))
+		if (isLunch) return '\n\n> Protip: lunch meetings are sometimes a bad idea. Remember, food!'
+		return '\n\n> Protip: different time zones can make meetings extra difficult. Plan ahead!'
 	}
 
 	const extractMeetingAttendees = ({ resources, text }) => {
@@ -46,7 +42,7 @@ const hackathonDemo = (firehose = getEventBus()) => {
 			return isConferenceRoom(item) && text.includes(item.resourceName)
 		})
 		if (candidates.length !== 1) {
-			const nag = `you mentioned ${candidates.length} conference rooms in your request.`
+			const nag = `Protip: you mentioned ${candidates.length} conference rooms in your request.`
 			const ten = _.sampleSize(resources.items, 10).filter(isConferenceRoom).map(summarizeRoom)
 			throw new Error(`${nag}\n\nHere are some nearby:\n${ten.map(one => `* ${one}`).join('\n')}`)
 		}
@@ -62,55 +58,60 @@ const hackathonDemo = (firehose = getEventBus()) => {
 		} else if (intervals.length < 1) {
 			return nextInterval() // now
 		}
-		const start = intervals[0].start ? intervals[0].start.date() : null
-		//if (!start) throw new Error('you did not mention any time period.')
-		const end = nextInterval(start) // impossible for start to be undefined?
-		const minutes = moment(end).diff(start, 'minutes', true) // positive float
+		const start = intervals[0].start ? intervals[0].start.date() : new Date() // now
+		const end = intervals[0].end ? intervals[0].end.date() : nextInterval(start)[1]
+		const weekend = start.getDay() === 6 || start.getDay() === 0 // Saturday/Sunday
+		if (weekend) throw new Error('that meeting would take place on the weekend.')
+		if (end < new Date()) throw new Error('that meeting would end in the past.')
+		const minutes = moment(end).diff(start, 'minutes', true) // as positive float
 		const agony = start.getHours() < HOUR_TOO_EARLY || end.getHours > HOUR_TOO_LATE
 		const insane = agony || minutes > MINUTES_TOO_MANY || minutes < MINUTES_TOO_FEW
 		if (!insane) return [start, end] // FIXME (tohagema): check for event conflicts?
-		throw new Error('I think you should pick a better time, during business hours.')
+		throw new Error('I think you should pick a short time during business hours.')
 	}
 
 	const markdownReplyTo = async ({ clients, events, resources, text }) => {
 		try {
-			firehose.log.info({ events, resources, text }, 'may create new calendar event')
+			log.info({ events, resources, text }, 'may create calendar event')
 			const emails = extractMeetingAttendees({ clients, events, resources, text })
 			const [start, end] = extractMeetingTimes({ clients, events, resources, text })
-			const event = { start, end, emails, details: text } // summary: 'Spark Meeting'
+			const event = { start, end, emails, long: text, short: 'Spark Meeting' }
 			const { data: created } = await clients.google.createCalendarEvent(event)
-			firehose.log.info({ created, events, resources, text }, 'created calendar event')
+			log.info({ created, events, resources, text }, 'created calendar event')
 			const markdown = `Okay, I created [a reservation](${event.htmlLink}) just for you.`
 			return markdown + warnings(start, end) // e.g. across lunch / outside 9-5pm / default
 		} catch (error) {
-			const err = ('code' in error) ? summarizeError(error) : error
-			firehose.log.warn({ err, events, resources, text }, 'will instruct')
+			const err = ('code' in error) ? summarizeError(error) : error // FIXME
+			log.info({ err, events, resources, text }, 'will post usage instructions')
 			return INSTRUCTIONS + (error.message ? `\n\n> Heads up: ${error.message}` : '')
 		}
 	}
 
-	firehose.on('spark:*',
+	bus.on('spark:*',
 		async function log ({ data }) {
-			firehose.log.info({ data }, 'just FYI')
+			log.info({ data }, 'just FYI')
 		})
 
-	firehose.on('spark:messages:created',
+	bus.on('spark:messages:created',
 		async function book ({ clients, data }) {
-			const { personEmail, roomId, text } = await clients.cisco.spark.messages.get(data.id)
-			if (!personEmail.endsWith('@cisco.com')) return denyEmailAddress({ clients, roomId })
+			const { personEmail, roomId, text } = await clients.cisco.readSecureMessage(data.id)
+			if (!personEmail.endsWith('@cisco.com')) {
+				const english = 'Sorry, but I only answer to Cisco employees.'
+				return clients.cisco.sendSecureMessage({ roomId, text: english })
+			}
 			try {
 				const { data: events } = await clients.google.listCalendarEvents()
 				const { data: resources } = await clients.google.listCalendarResources()
-				const markdown = await markdownReplyTo({ clients, events, resources, roomId, text })
-				await clients.cisco.spark.messages.create({ markdown, roomId })
+				const english = await markdownReplyTo({ clients, events, resources, roomId, text })
+				await clients.cisco.sendSecureMessage({ markdown: english, roomId })
 			} catch (error) {
 				const english = 'Sorry, something went wrong; please try that again.'
-				await clients.cisco.spark.messages.create({ roomId, text: english })
+				await clients.cisco.sendSecureMessage({ roomId, text: english })
 				throw error
 			}
 		})
 
-	return firehose
+	return bus
 
 }
 

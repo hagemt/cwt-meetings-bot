@@ -1,9 +1,8 @@
 const { EventEmitter } = require('events')
 
-const Bunyan = require('bunyan')
-const _ = require('lodash')
+const _ = require('lodash') // for _.once
 
-const PACKAGE_JSON = require('../package.json')
+const { getChildLogger } = require('./logging.js')
 
 const ALL_CHANNEL_NAME = 'spark:*'
 const CHANNEL_NAMES = new Set([
@@ -20,25 +19,6 @@ const CHANNEL_NAMES = new Set([
 
 const DEFAULT_CHANNEL_NAME = 'unknown'
 const DEFAULT_HANDLER_NAME = 'anonymous'
-
-const DEFAULT_ACCESS_TOKEN = process.env.CISCOSPARK_ACCESS_TOKEN
-const ROOT_LOGGER_LEVEL = process.env.LOG_LEVEL || 'info'
-
-const createClient = ({ token = DEFAULT_ACCESS_TOKEN }) => {
-	if (token) console.log(`spark ${token}`) // eslint-disable-line no-console
-	// TODO (tohagema): use the same client from ciscospark-tools (support)
-}
-
-const createLogger = (...args) => {
-	// TODO (tohagema): use the same logger from server, elsewhere?
-	const options = {
-		component: 'events',
-		level: ROOT_LOGGER_LEVEL,
-		name: PACKAGE_JSON.name,
-	}
-	return Bunyan.createLogger(options)
-		.child(Object.assign({}, ...args))
-}
 
 const createRegister = (bus, log) => {
 	return (consumerChannel, consumerHandler) => {
@@ -77,10 +57,9 @@ const createRegister = (bus, log) => {
 }
 
 const createEventBus = (...args) => {
-	const client = createClient({
-	})
 	const bus = new EventEmitter()
-	const log = createLogger({
+	const log = getChildLogger({
+		component: 'firehose',
 	})
 	const register = createRegister(bus, log)
 	const consume = (consumerChannel, ...args) => {
@@ -105,7 +84,7 @@ const createEventBus = (...args) => {
 		const handlers = [consumerHandler.name || DEFAULT_HANDLER_NAME] // is this useful?
 		log.debug({ channels, code, handlers }, `added ${channels.length} consumer(s)`)
 	})
-	return Object.assign(bus, ...args, { consume, register, log, recover, spark: client })
+	return Object.assign(bus, ...args, { consume, register, log, recover })
 }
 
 module.exports = {

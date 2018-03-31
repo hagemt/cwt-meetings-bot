@@ -1,8 +1,9 @@
-const { promisify } = require('util')
-
 const { google } = require('googleapis')
 const Spark = require('ciscospark')
 const _ = require('lodash')
+
+const config = require('config')
+const testers = config.get('cisco.testers')
 
 const Logging = require('./logging.js')
 const log = Logging.getChildLogger({
@@ -14,66 +15,78 @@ const GOOGLE_CALENDAR_SCOPES = Object.freeze([
 	'https://www.googleapis.com/auth/calendar',
 ])
 
-const GOOGLE_GSUITE_EMAILS = {
-	'joshand@cisco.com': 'josh@onetooneandon.to',
-	'tohagema@cisco.com': 'tor@onetooneandon.to',
-}
-
 const loadGoogleClients = ({ key, who }) => {
 
+	// the auth (provider) to client functions:
 	const viaJWT = new google.auth.JWT({
 		email: key.client_email, // service account
 		key: key.private_key, // 2048-bit RSA
 		scopes: GOOGLE_CALENDAR_SCOPES,
-		subject: GOOGLE_GSUITE_EMAILS[who],
+		subject: testers[who],
 	})
 
+	// add client objects here as necessary
 	const adminDirectoryV1 = google.admin('directory_v1')
 	const calendarV3 = google.calendar('v3')
 
-	const createCalendarEvent = promisify(calendarV3.events.insert)
-	const listCalendarEvents = promisify(calendarV3.events.list)
-	const listCalendarResources = promisify(adminDirectoryV1.resources.calendars.list)
-
+	// only expose functions as necessary
 	return Object.freeze({
 
-		createCalendarEvent: async ({ start, end, emails, details }) => {
-			const [firstEmail, ...otherEmails] = emails
+		createCalendarEvent: async ({ start, end, emails, long, short }) => {
+			const [firstEmailAddress, ...otherEmailAddresses] = Array.from(emails)
 			const invited = [{
-				email: firstEmail,
-				responseStatus: 'accepted',
+				email: firstEmailAddress,
+				responseStatus: 'tentative',
 			}]
-			for (const email of otherEmails) {
+			for (const email of otherEmailAddresses) {
 				invited.push({ email })
 			}
 			const event = {
 				attendees: invited,
-				description: details,
+				description: long,
 				end: { dateTime: end },
 				start: { dateTime: start },
-				summary: 'Spark Meeting',
+				summary: short || 'Spark Meeting',
 			}
-			log.info({ event }, 'create')
-			return createCalendarEvent({
-				auth: viaJWT, // default:
-				calendarId: 'primary',
-				resource: event,
+			log.info({ event }, 'will create event')
+			return new Promise((resolve, reject) => {
+				const options = {
+					auth: viaJWT, // default:
+					calendarId: 'primary',
+					resource: event,
+				}
+				calendarV3.events.insert(options, (err, res) => {
+					if (err) reject(err)
+					else resolve(res)
+				})
 			})
 		},
 
 		listCalendarEvents: async () => {
 			log.info('will list events')
-			return listCalendarEvents({
-				auth: viaJWT, // default:
-				calendarId: 'primary',
+			return new Promise((resolve, reject) => {
+				const options = {
+					auth: viaJWT, // default:
+					calendarId: 'primary',
+				}
+				calendarV3.events.list(options, (err, res) => {
+					if (err) reject(err)
+					else resolve(res)
+				})
 			})
 		},
 
 		listCalendarResources: async () => {
 			log.info('will list resources')
-			return listCalendarResources({
-				auth: viaJWT, // what?
-				customer: 'my_customer',
+			return new Promise((resolve, reject) => {
+				const options = {
+					auth: viaJWT, // default:
+					customer: 'my_customer',
+				}
+				adminDirectoryV1.resources.calendars.list(options, (err, res) => {
+					if (err) reject(err)
+					else resolve(res)
+				})
 			})
 		},
 
@@ -81,7 +94,7 @@ const loadGoogleClients = ({ key, who }) => {
 
 }
 
-const loadCiscoSparkClient = _.memoize(secret => Spark.init({
+const getSparkClient = _.memoize(secret => Spark.init({
 	credentials: {
 		authorization: {
 			access_token: secret,
@@ -89,13 +102,33 @@ const loadCiscoSparkClient = _.memoize(secret => Spark.init({
 	},
 }))
 
-const loadAll = ({ ciscospark, gsuite, webhook: { data } }) => ({
-	cisco: {
-		spark: loadCiscoSparkClient(ciscospark.bot.secret),
-	},
+const loadCiscoClients = ({ bot }) => {
+	const spark = getSparkClient(bot.secret)
+	return Object.freeze({
+		readSecureMessage: async (...args) => {
+			return spark.messages.get(...args)
+		},
+		sendSecureMessage: async (...args) => {
+			return spark.messages.create(...args)
+		},
+	})
+}
+
+// TODO: add methods that interact with Outlook
+const loadMicrosoftClients = () => Object.freeze({
+})
+
+const loadAll = async ({ ciscospark, gsuite, webhook }) => ({
+	cisco: loadCiscoClients({
+		bot: ciscospark.bot,
+	}),
 	google: loadGoogleClients({
-		key: gsuite.service,
-		who: data.personEmail,
+		key: gsuite.service, // account
+		who: webhook.data.personEmail,
+	}),
+	microsoft: loadMicrosoftClients({
+		// how to connect to exchange calendar
+		// using an LDAP account, probably
 	}),
 })
 

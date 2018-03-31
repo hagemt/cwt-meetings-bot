@@ -16,6 +16,7 @@ const createRootLogger = _.once(() => {
 		level: config.get('logger.level'),
 		name: config.get('logger.name'),
 		serializers: logSerializers,
+		src: false, // use NODE_ENV?
 		streams: logStreams,
 	})
 })
