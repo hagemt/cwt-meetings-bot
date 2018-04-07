@@ -19,7 +19,7 @@ const getServer = _.once(() => {
 	}
 	const server = http.createServer() // later: SSL
 	server.on('request', application.callback())
-	return httpShutdown(server)
+	return httpShutdown(server) // adds #shutdown
 })
 
 const createService = _.once(() => {
@@ -73,6 +73,10 @@ if (!module.parent) {
 			case 'production':
 				await webhooks.productionService(service)
 				break
+			case 'load':
+			case 'test':
+				break
+			case 'development':
 			default:
 				await webhooks.developmentService(service)
 			}

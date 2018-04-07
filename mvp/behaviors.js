@@ -29,12 +29,12 @@ const hackathonDemo = (bus = getEventBus()) => {
 
 	const warnings = (start, end) => {
 		const isEarly = moment(start).hours(9).minutes(0).seconds(0).milliseconds(0).isAfter(start)
-		if (isEarly) return '\n\n> Protip: early meetings are sometimes a bad idea. Remember, engineers!'
+		if (isEarly) return '\n\n> Protip: early meetings are sometimes a bad idea. People hate mornings!'
 		const isLate = moment(start).hours(17).minutes(0).seconds(0).milliseconds(0).isBefore(start)
-		if (isLate) return '\n\n> Protip: late meetings are sometimes a bad idea. Remember, parents!'
+		if (isLate) return '\n\n> Protip: late meetings are sometimes a bad idea. People have kids!'
 		const isLunch = LUNCHTIMES.some(any => moment(any, 'hh:mm').isBetween(start, end, 'minute'))
-		if (isLunch) return '\n\n> Protip: lunch meetings are sometimes a bad idea. Remember, food!'
-		return '\n\n> Protip: different time zones can make meetings extra difficult. Plan ahead!'
+		if (isLunch) return '\n\n> Protip: lunch meetings are sometimes a bad idea. People need food!'
+		return '\n\n> Protip: different time zones can make team meetings extra difficult. Plan ahead!'
 	}
 
 	const extractMeetingAttendees = ({ resources, text }) => {
@@ -87,12 +87,12 @@ const hackathonDemo = (bus = getEventBus()) => {
 		}
 	}
 
-	bus.on('spark:*',
+	bus.on('*',
 		async function log ({ data }) {
 			log.info({ data }, 'just FYI')
 		})
 
-	bus.on('spark:messages:created',
+	bus.on('messages:created',
 		async function book ({ clients, data }) {
 			const { personEmail, roomId, text } = await clients.cisco.readSecureMessage(data.id)
 			if (!personEmail.endsWith('@cisco.com')) {
