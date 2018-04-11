@@ -3,7 +3,6 @@ const Spark = require('ciscospark')
 const _ = require('lodash')
 
 const config = require('config')
-const testers = config.get('cisco.testers')
 
 const Logging = require('./logging.js')
 const log = Logging.getChildLogger({
@@ -15,6 +14,8 @@ const GOOGLE_CALENDAR_SCOPES = Object.freeze([
 	'https://www.googleapis.com/auth/calendar',
 ])
 
+const EMAIL_WHITELIST = config.get('ciscospark.testers')
+
 const loadGoogleClients = ({ key, who }) => {
 
 	// the auth (provider) to client functions:
@@ -22,7 +23,7 @@ const loadGoogleClients = ({ key, who }) => {
 		email: key.client_email, // service account
 		key: key.private_key, // 2048-bit RSA
 		scopes: GOOGLE_CALENDAR_SCOPES,
-		subject: testers[who],
+		subject: EMAIL_WHITELIST[who],
 	})
 
 	// add client objects here as necessary

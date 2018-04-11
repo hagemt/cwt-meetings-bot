@@ -26,7 +26,7 @@ const createRouters = _.once(() => {
 			const { actorId, data, event, id, resource } = await CSWV.validate(request) // may throw Error
 			if (actorId === bot.actorId || id !== bot.webhookId) return response.status = 204 // No Content
 			const clients = await loadAll({ ciscospark: { bot }, gsuite: { service }, webhook: { data } })
-			response.body = { consumed: events.consume(`spark:${resource}:${event}`, { clients, data }) }
+			response.body = { consumed: events.consume(`${resource}:${event}`, { clients, data }) }
 			response.status = 200 // OK
 		} catch (error) {
 			throw Boom.badRequest(error.message)
