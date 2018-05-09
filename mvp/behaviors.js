@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const url = require('url')
 
 const chrono = require('chrono-node')
 const moment = require('moment')
@@ -17,9 +18,9 @@ const hackathonDemo = (bus = getEventBus()) => {
 	const INSTRUCTIONS = fs.readFileSync(path.resolve(__dirname, 'instructions.md')).toString()
 	const CONFERENCE_ROOM_TYPES = new Set(['CONFERENCE_ROOM']) // TODO: change these to suit GSuite?
 	const isConferenceRoom = ({ resourceCategory }) => CONFERENCE_ROOM_TYPES.has(resourceCategory)
-	const isEmailAddress = any => /.@./.test(any) // TODO: proper check for RFC email address?
+	const isEmailAddress = any => /^[^@]+@[^@]+$/.test(any) // TODO: check for RFC email address?
 
-	const DEFAULT_MEETING_DURATION = { minutes: 15 } // short enough that it's probably ideal
+	const DEFAULT_MEETING_DURATION = { minutes: 25 } // short enough that it's probably ideal
 	const [HOUR_TOO_EARLY, HOUR_TOO_LATE, MINUTES_TOO_FEW, MINUTES_TOO_MANY] = [6, 22, 1, 121]
 	const LUNCHTIMES = ['11:35', '11:45', '11:55', '12:05', '12:15', '12:25', '12:35', '12:45', '12:55']
 	const nextInterval = (now = new Date()) => [now, moment(now).add(DEFAULT_MEETING_DURATION).toDate()]
@@ -70,21 +71,44 @@ const hackathonDemo = (bus = getEventBus()) => {
 		throw new Error('I think you should pick a short time during business hours.')
 	}
 
+	const eventSummary = ({ start, end, emails, long, short }) => `# Here's my proposal:
+
+* Who: ${['You'].concat(emails.slice(1)).join(', ')}
+* What: ${short}
+* When: ${start.toISOString()} - ${end.toISOString()}
+* Where: (meeting room via fake email) ${emails[0]}
+* Why: ${long}
+`
+
 	const markdownReplyTo = async ({ clients, events, resources, text }) => {
 		try {
 			log.info({ events, resources, text }, 'may create calendar event')
 			const emails = extractMeetingAttendees({ clients, events, resources, text })
 			const [start, end] = extractMeetingTimes({ clients, events, resources, text })
-			const event = { start, end, emails, long: text, short: 'Spark Meeting' }
+			const title = 'Digital Workspace Meeting' // extractMeetingTitle()
+			const event = { start, end, emails, long: text, short: title }
+			/*
 			const { data: created } = await clients.google.createCalendarEvent(event)
 			log.info({ created, events, resources, text }, 'created calendar event')
 			const markdown = `Okay, I created [a reservation](${event.htmlLink}) just for you.`
-			return markdown + warnings(start, end) // e.g. across lunch / outside 9-5pm / default
+			*/
+			log.info({ event, events, resources, text }, 'would create calendar event via GSuite')
+			//const markdown = `Event:\n\n\`\`\`json\n${JSON.stringify(event, null, '\t')}\n\`\`\``
+			//return markdown + warnings(start, end) // e.g. across lunch / outside 9-5pm / default
+			return eventSummary(event) + warnings(start, end) // FIXME (tohagema): read-only toggle?
 		} catch (error) {
 			const err = ('code' in error) ? summarizeError(error) : error // FIXME
 			log.info({ err, events, resources, text }, 'will post usage instructions')
 			return INSTRUCTIONS + (error.message ? `\n\n> Heads up: ${error.message}` : '')
 		}
+	}
+
+	const markdownMeetingsURLs = ({ request }) => {
+		const buildURL = (...args) => new url.URL(...args).toString()
+		const meetingsURI = `/v0/meetings/${request.get('requestid') || 'default'}`
+		const positiveURL = buildURL(meetingsURI + '?feedback=positive', request.href)
+		const negativeURL = buildURL(meetingsURI + '?feedback=negative', request.href)
+		return `Click [👍](${positiveURL}) or [👎](${negativeURL}) to provide feedback!`
 	}
 
 	bus.on('*',
@@ -93,8 +117,8 @@ const hackathonDemo = (bus = getEventBus()) => {
 		})
 
 	bus.on('messages:created',
-		async function book ({ clients, data }) {
-			const { personEmail, roomId, text } = await clients.cisco.readSecureMessage(data.id)
+		async function book ({ clients, data, request }) {
+			const { personEmail, roomId, text } = await clients.cisco.readSecureMessage({ id: data.id })
 			if (!personEmail.endsWith('@cisco.com')) {
 				const english = 'Sorry, but I only answer to Cisco employees.'
 				return clients.cisco.sendSecureMessage({ roomId, text: english })
@@ -102,7 +126,8 @@ const hackathonDemo = (bus = getEventBus()) => {
 			try {
 				const { data: events } = await clients.google.listCalendarEvents()
 				const { data: resources } = await clients.google.listCalendarResources()
-				const english = await markdownReplyTo({ clients, events, resources, roomId, text })
+				const markdown = await markdownReplyTo({ clients, events, resources, roomId, text })
+				const english = markdown + '\n\n' + markdownMeetingsURLs({ request })
 				await clients.cisco.sendSecureMessage({ markdown: english, roomId })
 			} catch (error) {
 				const english = 'Sorry, something went wrong; please try that again.'

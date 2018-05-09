@@ -1,10 +1,13 @@
-const { google } = require('googleapis')
-const Spark = require('ciscospark')
-const _ = require('lodash')
+const url = require('url')
 
 const config = require('config')
+const fetch = require('node-fetch')
+const { google } = require('googleapis')
+//const _ = require('lodash')
 
 const Logging = require('./logging.js')
+const PACKAGE_JSON = require('../package.json')
+
 const log = Logging.getChildLogger({
 	component: 'clients',
 })
@@ -95,22 +98,53 @@ const loadGoogleClients = ({ key, who }) => {
 
 }
 
-const getSparkClient = _.memoize(secret => Spark.init({
-	credentials: {
-		authorization: {
-			access_token: secret,
-		},
-	},
-}))
+const USER_AGENT_PREFIX = `${PACKAGE_JSON.name}/${PACKAGE_JSON.version} (+${PACKAGE_JSON.bugs.url})`
+const USER_AGENT_SUFFIX = `${process.release.name}/${process.version} ${process.platform}/${process.arch}`
+const JSON_USER_AGENT = `${USER_AGENT_PREFIX} ${USER_AGENT_SUFFIX}`
+
+const json = async (uri, options = {}) => {
+	const JSON_URL_ORIGIN = options.url || 'https://api.ciscospark.com'
+	const request = Object.assign({ method: 'GET' }, options, {
+		url: new url.URL(uri, JSON_URL_ORIGIN).toString(),
+	})
+	if (typeof request.body === 'object') {
+		request.body = JSON.stringify(request.body)
+	}
+	const response = await fetch(request.url, request)
+	switch (response.status) {
+	case 200:
+		return await response.json()
+	case 204:
+		response.end()
+		return
+	default:
+		throw new Error(await response.text())
+	}
+}
 
 const loadCiscoClients = ({ bot }) => {
-	const spark = getSparkClient(bot.secret)
+	const authorization = `Bearer ${bot.secret}`
+	const JSON_MIME_TYPE = 'application/json'
+	const JSON_HEADERS = Object.freeze({
+		'accept': JSON_MIME_TYPE,
+		'authorization': authorization,
+		'content-type': JSON_MIME_TYPE,
+		'user-agent': JSON_USER_AGENT,
+	})
 	return Object.freeze({
 		readSecureMessage: async (...args) => {
-			return spark.messages.get(...args)
+			const { id } = Object.assign({}, ...args)
+			return json(`/v1/messages/${id}`, {
+				headers: JSON_HEADERS,
+			})
 		},
 		sendSecureMessage: async (...args) => {
-			return spark.messages.create(...args)
+			const message = Object.assign({}, ...args)
+			return json('/v1/messages', {
+				body: message, // check?
+				headers: JSON_HEADERS,
+				method: 'POST',
+			})
 		},
 	})
 }

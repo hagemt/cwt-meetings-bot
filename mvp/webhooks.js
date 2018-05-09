@@ -110,7 +110,8 @@ const developmentService = async ({ server }) => {
 }
 
 const productionService = async () => {
-	throw new Error('not ready for production')
+	// TODO (tohagema): check webhook delivers
+	//throw new Error('not ready for production')
 }
 
 module.exports = {

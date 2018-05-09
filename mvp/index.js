@@ -1,5 +1,6 @@
 const http = require('http')
 
+const Boom = require('boom')
 const config = require('config')
 const httpShutdown = require('http-shutdown')
 const koaOmnibus = require('koa-omnibus')
@@ -11,13 +12,46 @@ const webhooks = require('./webhooks.js')
 
 const getServer = _.once(() => {
 	const application = koaOmnibus.createApplication({
-		//targetLogger: (options, context, fields) => Logging.getChildLogger(fields),
+		// FIXME (tohagema): something does not seem work work correctly with this:
+		targetLogger: (options, context, fields) => Logging.getChildLogger(fields),
 	})
-	for (const router of Routers.getAll()) {
-		application.use(router.allowedMethods())
+	application.use(async ({ request, response }, next) => {
+		await next()
+		const message = `${request.method} ${request.url}`
+		switch (response.status) {
+		case 201:
+			response.body = Object.assign({}, response.body, {
+				href: response.get('location'),
+			})
+			break
+		case 204:
+			response.body = ''
+			break
+		case 404:
+			throw Boom.notFound(message)
+		case 405:
+			throw Boom.methodNotAllowed(message)
+		case 501:
+			throw Boom.notImplemented(message)
+		default:
+		}
+	})
+	for (const router of Routers.forServer()) {
+		const allowedMethods = router.allowedMethods({
+			/*
+			// TODO (tohagema): the version above is less magic
+			methodNotAllowed: () => new Boom.methodNotAllowed(),
+			notImplemented: () => new Boom.notImplemented(),
+			throw: true,
+			*/
+			throw: false,
+		})
+		application.use(allowedMethods)
 		application.use(router.routes())
 	}
-	const server = http.createServer() // later: SSL
+	// TODO (tohagema): SSL (https)
+	// locate certificate via config
+	const server = http.createServer()
 	server.on('request', application.callback())
 	return httpShutdown(server) // adds #shutdown
 })

@@ -88,7 +88,11 @@ const createEventBus = (...args) => {
 		if (!consumerChannel) log.warn({ err: error }, 'unknown consumer channel')
 		else log.warn({ err: error }, `from consumer (channel: ${consumerChannel})`)
 	})
-	// no 'recovered' handler, by default (need to implement this)
+	/*
+	bus.on('recovered', (error, consumerChannel) => {
+		bus.emit('error', error, consumerChannel)
+	})
+	*/
 	bus.on('registered', (consumerHandler, consumerChannels) => {
 		const channels = Array.isArray(consumerChannels) ? consumerChannels.slice() : []
 		if (channels.length === 0) channels.push(consumerChannels || CHANNEL_NAME_DEFAULT)
