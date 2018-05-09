@@ -1,29 +1,17 @@
-//const assert = require('assert')
+const assert = require('assert')
+const url = require('url')
 
-const config = require('config')
-const supertest = require('supertest')
+const fetch = require('node-fetch')
 
-const MVP = require('../mvp')
+describe('docker container (ping)', () => {
 
-describe('MVP', () => {
+	const ORIGIN_URL = process.env.ORIGIN_URL || 'http://localhost:8080'
+	const buildURL = (...args) => new url.URL(...args).toString()
 
-	const port = config.get('server.port')
-	const test = { port }
-
-	before(() => {
-		Object.assign(test, MVP.createService())
-		return MVP.startService(test, { port })
-	})
-
-	it('responds to ping', () => {
-		return supertest(test.server)
-			.get('/v0/ping')
-			.expect(200)
-	})
-
-	after(() => {
-		if (!test.server.listening) return
-		return MVP.stopService(test)
+	it('responds 200 (OK)', async () => {
+		const response = await fetch(buildURL('/v0/ping', ORIGIN_URL))
+		assert.equal(response.status, 200, 'unexpected HTTP response status')
+		assert('lastUpdated' in await response.json(), 'no lastUpdated time')
 	})
 
 })
