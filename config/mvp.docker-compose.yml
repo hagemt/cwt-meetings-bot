@@ -1,0 +1,17 @@
+---
+
+version: '3.3'
+
+networks:
+  cwt-meetings-bot-mvp:
+    driver: bridge
+
+services:
+  mvp:
+    build:
+      context: ..
+      dockerfile: ./config/mvp.Dockerfile
+    networks:
+    - cwt-meetings-bot-mvp
+    ports:
+    - "8080:8080"

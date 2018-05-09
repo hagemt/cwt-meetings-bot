@@ -21,6 +21,7 @@ module.exports = {
 	root: true,
 
 	rules: {
+		'comma-dangle': ['error', 'always-multiline'],
 		'import/unambiguous': 'off',
 		'indent': ['error', 'tab'],
 		'linebreak-style': ['error', 'unix'],
