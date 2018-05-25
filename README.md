@@ -1,4 +1,4 @@
-# Cisco Spark Bot to Schedule Meeting Rooms
+# Cisco Webex Teams bot to schedule meeting rooms
 
 Hackathon code for Develop@Cisco 2018 (MVP: Cisco Spark bot to help schedule meetings)
 
@@ -8,8 +8,8 @@ If there's not a meeting, IDK maybe it should create one with just one person in
 
 TBD: other commands, or a more logical interface, without scope creeping too far into NLP.
 
-## Philosophy
+## Philosophy and tools
 
-Use `ciscospark-tools` (w/ new webhooks features) and pattern of using an EventEmitter acting as a bus.
+Use `cisco-webex-tools` (w/ new webhooks features) and pattern of using an EventEmitter acting as a bus.
 
 Validation code packaged originally as `ciscospark-webhook-validator` module. Integrates with GSuite.
