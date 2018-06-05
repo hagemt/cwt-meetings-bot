@@ -40,7 +40,7 @@ const hackathonDemo = (bus = getEventBus()) => {
 
 	const extractMeetingAttendees = ({ resources, text }) => {
 		const candidates = resources.items.filter((item) => {
-			return isConferenceRoom(item) && text.includes(item.resourceName)
+			return isConferenceRoom(item) && text.toLowerCase().includes(item.resourceName.toLowerCase())
 		})
 		if (candidates.length !== 1) {
 			const nag = `You mentioned ${candidates.length} conference rooms in your last request.`
