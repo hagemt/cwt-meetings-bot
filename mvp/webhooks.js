@@ -95,8 +95,8 @@ const listWebhooks = async () => {
 const developmentService = async ({ server }) => {
 	const { port } = server.address() // null if not listening
 	const demoURL = buildURL('/v0/demo', await getTunnelURL(port))
-	for (const { id, targetUrl } of await listWebhooks()) {
-		if (id === BOT.webhookId && targetUrl !== demoURL) {
+	for (const { id } of await listWebhooks()) {
+		if (id === BOT.webhookId) {
 			await updateWebhook({
 				name: 'development',
 				status: 'active',
