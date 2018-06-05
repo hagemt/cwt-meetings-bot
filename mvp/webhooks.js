@@ -15,10 +15,10 @@ const buildURL = (anyURI, originURL = DEFAULT_URL_ORIGIN) => new url.URL(anyURI,
 const BOT = config.get('ciscospark.bot')
 
 const newTunnelURL = async (port = DEFAULT_HTTP_PORT) => {
-	const options = {
+	const options = Object.assign({}, config.get('ngrok.defaults'), {
 		addr: port,
 		proto: 'http',
-	}
+	})
 	const httpsURL = await ngrok.connect(options)
 	process.on('SIGUSR2', () => ngrok.kill())
 	return httpsURL

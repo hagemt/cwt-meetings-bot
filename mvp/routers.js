@@ -25,10 +25,10 @@ CSWV.getAccessToken = async () => bot.secret // static
 const DEFAULT_ORIGIN = process.env.CISCOSPARK_URL_ORIGIN || 'https://api.ciscospark.com'
 const buildURL = (anyURI, origin = DEFAULT_ORIGIN) => new url.URL(anyURI, origin).toString()
 
-const upstreamServices = async (pingURL = buildURL('/v1/ping')) => {
+const hydraStatus = async (pingURL = buildURL('/v1/ping')) => {
 	const response = await fetch(pingURL) // no auth necessary
 	if (!response.ok) throw new Error(await response.text())
-	return [_.omit(await response.json(), ['upstreamServices'])]
+	return _.omit(await response.json(), ['upstreamServices'])
 }
 
 const createAdminRouter = () => {
@@ -156,21 +156,42 @@ const createMeetingsRouter = () => {
 const mvpRouters = _.once(() => {
 	const events = hackathonDemo()
 	const pingUpdate = async () => {
-		const lastUpdated = new Date()
+		let currentState = 'online'
+		const otherServices = []
 		try {
-			return {
-				lastUpdated: lastUpdated.toISOString(),
-				upstreamServices: await upstreamServices(),
+			const requiredServiceNotOnline = ({ serviceState, serviceType }) => {
+				if (serviceType !== 'REQUIRED') return false
+				return serviceState !== 'online'
+			}
+			otherServices.push(await hydraStatus()) // anything else?
+			if (otherServices.some(requiredServiceNotOnline)) {
+				currentState = 'offline'
 			}
 		} catch (error) {
-			const upstreamService = {
-				errorMessage: error.message,
-			}
-			return {
-				lastUpdated: lastUpdated.toISOString(),
-				upstreamServices: [upstreamService],
-			}
+			currentState = 'offline'
+			otherServices.push({
+				serviceName: 'hydra',
+				serviceType: 'REQUIRED',
+				serviceState: 'offline',
+				message: error.message,
+			})
 		}
+		const serviceDetails = {
+			instanceId: 0,
+			host: '0.0.0.0',
+			port: 0,
+		}
+		const serviceSummary = {
+			serviceName: 'cwt-meetings-bot',
+			serviceType: 'REQUIRED',
+			serviceState: currentState,
+			message: process.env.NODE_ENV,
+			serviceInstance: serviceDetails,
+			lastUpdated: new Date().toISOString(),
+			upstreamServices: otherServices,
+			defaultCharset: 'UTF-8',
+		}
+		return serviceSummary
 	}
 	const throttledUpdate = _.throttle(pingUpdate, 60 * 1000 / PINGS_PER_MINUTE)
 	const v0 = new KoaRouter({
@@ -180,7 +201,7 @@ const mvpRouters = _.once(() => {
 		response.body = await throttledUpdate()
 		response.status = 200 // OK
 	})
-	v0.post('/demo', async ({ request, response }) => {
+	v0.post('/demo', async ({ omnibus, request, response }) => {
 		try {
 			const { actorId, data, event, id, resource } = request.body = await CSWV.validate(request)
 			if (actorId === bot.actorId || id !== bot.webhookId) return response.status = 204 // No Content
@@ -188,6 +209,7 @@ const mvpRouters = _.once(() => {
 			response.body = { consumed: events.consume(`${resource}:${event}`, { clients, data, request }) }
 			response.status = 200 // OK
 		} catch (error) {
+			omnibus.log.warn({ err: error }, 'bad request')
 			throw Boom.badRequest(error.message)
 		}
 	})

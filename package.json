@@ -1,14 +1,15 @@
 {
   "name": "cwt-meetings-bot",
-  "version": "0.0.0-alpha",
+  "version": "0.0.0-beta",
   "author": "Tor E Hagemann <tohagema@cisco.com>",
   "description": "Cisco Webex Teams bot to help schedule meetings",
-  "homepage": "https://github.com/hagemt/ciscospark-calendarbot#readme",
+  "homepage": "https://hagemt.github.io/cwt-meetings-bot",
   "license": "UNLICENSED",
   "main": "mvp/index.js",
   "private": true,
+  "proxy": "http://localhost:8080",
   "bugs": {
-    "url": "https://github.com/hagemt/ciscospark-calendarbot/issues"
+    "url": "https://github.com/hagemt/cwt-meetings-bot/issues"
   },
   "dependencies": {
     "@koa/cors": "2.2.1",
@@ -16,15 +17,15 @@
     "bunyan": "1.8.12",
     "chrono-node": "1.3.5",
     "ciscospark-webhook-validator": "1.0.0",
-    "co-body": "5.2.0",
+    "co-body": "6.0.0",
     "config": "1.30.0",
     "dataloader": "1.4.0",
-    "googleapis": "29.0.0",
+    "googleapis": "31.0.2",
     "http-shutdown": "1.2.0",
     "koa": "2.5.1",
     "koa-omnibus": "0.9.3",
     "koa-router": "7.4.0",
-    "koa-static": "4.0.2",
+    "koa-static": "4.0.3",
     "lodash": "4.17.10",
     "moment": "2.22.1",
     "ngrok": "3.0.1",
@@ -34,16 +35,16 @@
   },
   "devDependencies": {
     "eslint": "4.19.1",
-    "eslint-plugin-import": "2.11.0",
+    "eslint-plugin-import": "2.12.0",
     "eslint-plugin-mocha": "5.0.0",
     "eslint-plugin-node": "6.0.1",
-    "eslint-plugin-react": "7.7.0",
-    "mocha": "5.1.1",
-    "nyc": "11.7.1",
-    "react": "16.3.2",
-    "react-dom": "16.3.2",
+    "eslint-plugin-react": "7.8.2",
+    "mocha": "5.2.0",
+    "nyc": "11.8.0",
+    "react": "16.4.0",
+    "react-dom": "16.4.0",
     "react-scripts": "1.1.4",
-    "supertest": "3.0.0"
+    "supertest": "3.1.0"
   },
   "directories": {
     "test": "test"
@@ -65,15 +66,15 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hagemt/ciscospark-calendarbot.git"
+    "url": "git+https://github.com/hagemt/cwt-meetings-bot.git"
   },
   "scripts": {
     "precoverage": "nyc -- npm run mocha",
     "coverage": "nyc report --reporter=html",
     "postcoverage": "nyc check-coverage --lines 0",
     "predocker": "docker build --file ./config/mvp.Dockerfile --tag cwt-meetings-bot/mvp .",
-    "docker": "docker run --detach -p 8080:8080 cwt-meetings-bot/mvp # later: docker rm $CONTAINER",
-    "postdocker": "node scripts/browser.window.js http://localhost:8080/v0/ping https://web.ciscospark.com/",
+    "docker": "docker run --detach -p 8080:8080 cwt-meetings-bot/mvp # later: docker rm -f $CONTAINER_ID",
+    "postdocker": "node scripts/browser.window.js http://localhost:8080/v0/ping https://teams.webex.com/",
     "eslint": "eslint .eslintrc.js config mvp scripts test --report-unused-disable-directives",
     "mocha": "NODE_ENV=test mocha test/mvp.js",
     "mvp": "node mvp | bunyan",

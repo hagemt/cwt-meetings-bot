@@ -1,20 +1,24 @@
 const http = require('http')
+const path = require('path')
 
 const Boom = require('boom')
 const config = require('config')
 const httpShutdown = require('http-shutdown')
 const koaOmnibus = require('koa-omnibus')
+const koaStatic = require('koa-static')
 const _ = require('lodash')
 
 const Logging = require('./logging.js')
 const Routers = require('./routers.js')
 const webhooks = require('./webhooks.js')
 
-const getServer = _.once(() => {
+const getApplicationServer = _.once(() => {
 	const application = koaOmnibus.createApplication({
 		// FIXME (tohagema): something does not seem work work correctly with this:
-		targetLogger: (options, context, fields) => Logging.getChildLogger(fields),
+		//targetLogger: (options, context, fields) => Logging.getChildLogger(fields),
 	})
+	const SERVED_PATH = path.resolve(__dirname, '..', 'served')
+	application.use(koaStatic(SERVED_PATH, { defer: true }))
 	application.use(async ({ request, response }, next) => {
 		await next()
 		const message = `${request.method} ${request.url}`
@@ -60,7 +64,7 @@ const createService = _.once(() => {
 	const log = Logging.getChildLogger({
 		component: 'service',
 	})
-	const server = getServer()
+	const server = getApplicationServer()
 	return Object.freeze({ log, server })
 })
 

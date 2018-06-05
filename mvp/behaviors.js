@@ -20,7 +20,7 @@ const hackathonDemo = (bus = getEventBus()) => {
 	const isConferenceRoom = ({ resourceCategory }) => CONFERENCE_ROOM_TYPES.has(resourceCategory)
 	const isEmailAddress = any => /^[^@]+@[^@]+$/.test(any) // TODO: check for RFC email address?
 
-	const DEFAULT_MEETING_DURATION = { minutes: 25 } // short enough that it's probably ideal
+	const DEFAULT_MEETING_DURATION = { minutes: 15 } // short enough that it's probably ideal
 	const [HOUR_TOO_EARLY, HOUR_TOO_LATE, MINUTES_TOO_FEW, MINUTES_TOO_MANY] = [6, 22, 1, 121]
 	const LUNCHTIMES = ['11:35', '11:45', '11:55', '12:05', '12:15', '12:25', '12:35', '12:45', '12:55']
 	const nextInterval = (now = new Date()) => [now, moment(now).add(DEFAULT_MEETING_DURATION).toDate()]
@@ -43,7 +43,7 @@ const hackathonDemo = (bus = getEventBus()) => {
 			return isConferenceRoom(item) && text.includes(item.resourceName)
 		})
 		if (candidates.length !== 1) {
-			const nag = `Protip: you mentioned ${candidates.length} conference rooms in your request.`
+			const nag = `You mentioned ${candidates.length} conference rooms in your last request.`
 			const ten = _.sampleSize(resources.items, 10).filter(isConferenceRoom).map(summarizeRoom)
 			throw new Error(`${nag}\n\nHere are some nearby:\n${ten.map(one => `* ${one}`).join('\n')}`)
 		}
@@ -71,12 +71,12 @@ const hackathonDemo = (bus = getEventBus()) => {
 		throw new Error('I think you should pick a short time during business hours.')
 	}
 
-	const eventSummary = ({ start, end, emails, long, short }) => `# Here's my proposal:
+	const eventSummary = ({ start, end, emails, long, short }) => `I'm not allowed to book this yet. Here's what I understood:
 
 * Who: ${['You'].concat(emails.slice(1)).join(', ')}
 * What: ${short}
-* When: ${start.toISOString()} - ${end.toISOString()}
-* Where: (meeting room via fake email) ${emails[0]}
+* When: from ${String(start)} to ${String(end)}
+* Where: (fake email for room resource) ${emails[0]}
 * Why: ${long}
 `
 
@@ -87,25 +87,26 @@ const hackathonDemo = (bus = getEventBus()) => {
 			const [start, end] = extractMeetingTimes({ clients, events, resources, text })
 			const title = 'Digital Workspace Meeting' // extractMeetingTitle()
 			const event = { start, end, emails, long: text, short: title }
-			/*
+			const isReadOnly = !process.env.USE_GSUITE // simplest toggle
+			if (isReadOnly) {
+				log.info({ event, events, resources, text }, 'would create calendar event via GSuite')
+				return eventSummary(event) + warnings(start, end) // FIXME (tohagema): better toggle?
+			}
 			const { data: created } = await clients.google.createCalendarEvent(event)
 			log.info({ created, events, resources, text }, 'created calendar event')
 			const markdown = `Okay, I created [a reservation](${event.htmlLink}) just for you.`
-			*/
-			log.info({ event, events, resources, text }, 'would create calendar event via GSuite')
 			//const markdown = `Event:\n\n\`\`\`json\n${JSON.stringify(event, null, '\t')}\n\`\`\``
-			//return markdown + warnings(start, end) // e.g. across lunch / outside 9-5pm / default
-			return eventSummary(event) + warnings(start, end) // FIXME (tohagema): read-only toggle?
+			return markdown + warnings(start, end) // e.g. across lunch / outside 9-5pm / default
 		} catch (error) {
 			const err = ('code' in error) ? summarizeError(error) : error // FIXME
 			log.info({ err, events, resources, text }, 'will post usage instructions')
-			return INSTRUCTIONS + (error.message ? `\n\n> Heads up: ${error.message}` : '')
+			return error.message ? INSTRUCTIONS + `\n\n> ${error.message}` : INSTRUCTIONS
 		}
 	}
 
 	const markdownMeetingsURLs = ({ request }) => {
 		const buildURL = (...args) => new url.URL(...args).toString()
-		const meetingsURI = `/v0/meetings/${request.get('requestid') || 'default'}`
+		const meetingsURI = `/v0/meetings/${request.get('trackingid') || 'default'}`
 		const positiveURL = buildURL(meetingsURI + '?feedback=positive', request.href)
 		const negativeURL = buildURL(meetingsURI + '?feedback=negative', request.href)
 		return `Click [👍](${positiveURL}) or [👎](${negativeURL}) to provide feedback!`
